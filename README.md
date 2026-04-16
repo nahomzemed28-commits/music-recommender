@@ -2,32 +2,155 @@
 
 ## Project Summary
 
-In this project you will build and explain a small music recommender system.
+This project simulates how a basic content-based music recommendation system works.
+Given a user's taste profile (preferred genre, mood, energy level, and acoustic preference),
+the system scores every song in a small catalog and returns the top matches with plain-language
+explanations of why each song was chosen.
 
-Your goal is to:
-
-- Represent songs and a user "taste profile" as data
-- Design a scoring rule that turns that data into recommendations
-- Evaluate what your system gets right and wrong
-- Reflect on how this mirrors real world AI recommenders
-
-Replace this paragraph with your own summary of what your version does.
+The goal is to mirror — in simplified form — the kind of logic Spotify or YouTube use when
+suggesting "you might also like" tracks, and to make that process transparent and explainable
+rather than a black box.
 
 ---
 
 ## How The System Works
 
-Explain your design in plain language.
+### 1. How Real Recommendation Systems Work
 
-Some prompts to answer:
+Major streaming platforms like Spotify and YouTube use two broad strategies to predict what
+listeners will enjoy:
 
-- What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-- What information does your `UserProfile` store
-- How does your `Recommender` compute a score for each song
-- How do you choose which songs to recommend
+**Collaborative Filtering** uses the behavior of *other users* to make predictions.
+If thousands of people who loved Song A also tend to play Song B, the system infers that
+you might like Song B too — even if it sounds nothing like Song A. The input data is
+behavioral: plays, skips, playlist adds, replays, and thumbs up/down ratings.
+The system never needs to know anything about the song itself; it only tracks patterns
+in how people collectively listen. Spotify's "Discover Weekly" is driven heavily by this.
 
-You can include a simple diagram or bullet list if helpful.
+**Content-Based Filtering** ignores what other users do and focuses entirely on the
+*attributes of the song itself*. Each track is described by a set of audio features
+(tempo, energy, valence, acousticness, genre, mood) and the system finds songs that
+are numerically similar to songs the user already likes. This approach does not require
+a large user base, and it can explain its reasoning clearly: "this was recommended
+because it matches your preferred genre and has a similar energy level."
+
+**Our system is content-based.** We assign each song a score based on how closely its
+attributes match the user's stored preferences. No listening history is required — only
+a taste profile.
+
+---
+
+### 2. Features Each `Song` Uses
+
+The `Song` dataclass in `src/recommender.py` stores these attributes per track:
+
+| Feature | Type | Description |
+|---|---|---|
+| `genre` | string | Musical genre (e.g. pop, lofi, rock, jazz) |
+| `mood` | string | Emotional tone (e.g. happy, chill, intense, melancholic) |
+| `energy` | float 0–1 | How active or driving the track feels |
+| `valence` | float 0–1 | Musical positivity — high = bright/cheerful, low = dark/sad |
+| `danceability` | float 0–1 | How suitable the track is for dancing |
+| `acousticness` | float 0–1 | How acoustic (vs electronic) the track sounds |
+| `tempo_bpm` | int | Beats per minute |
+
+The most decision-relevant features for a first pass are **genre**, **mood**, and **energy**,
+because they capture the broad "vibe" of a track. `valence` adds emotional precision
+(distinguishing "energetic but dark" metal from "energetic and bright" pop), while
+`acousticness` helps separate electronic and organic sounds even within the same genre.
+
+---
+
+### 3. What the `UserProfile` Stores
+
+The `UserProfile` dataclass represents a listener's taste at a moment in time:
+
+| Field | Type | Description |
+|---|---|---|
+| `favorite_genre` | string | The genre the user most wants to hear |
+| `favorite_mood` | string | The emotional atmosphere they want |
+| `target_energy` | float 0–1 | Their preferred energy level |
+| `likes_acoustic` | bool | Whether they prefer acoustic over electronic sounds |
+
+This profile is deliberately small and explicit. In a real system it would be inferred
+automatically from listening history; here the user declares it directly.
+
+---
+
+### 4. Algorithm Recipe — How the Score Is Calculated
+
+The system uses a **weighted scoring rule** to judge each song individually, then a
+**ranking rule** to sort the full catalog.
+
+#### Scoring Rule (one song at a time)
+
+For a single song, the score is built from four components:
+
+```
+score = genre_points + mood_points + energy_proximity + acoustic_bonus
+```
+
+| Component | Logic | Max Points |
+|---|---|---|
+| Genre match | +2.0 if `song.genre == user.favorite_genre` | 2.0 |
+| Mood match | +1.0 if `song.mood == user.favorite_mood` | 1.0 |
+| Energy proximity | `1.0 - abs(song.energy - user.target_energy)` | 1.0 |
+| Acoustic bonus | +0.5 if `user.likes_acoustic` and `song.acousticness > 0.6` | 0.5 |
+
+**Why proximity scoring for energy?**
+A flat "higher is better" rule would always push the most intense songs to the top,
+regardless of what the user actually wants. A proximity score rewards songs that are
+*close to the target* — so a user who wants moderate energy (0.5) gets penalized
+less for a 0.6 song than for a 0.9 song. The formula `1.0 - abs(a - b)` always
+returns a value between 0.0 (opposite ends of the scale) and 1.0 (perfect match).
+
+**Why is genre worth more than mood?**
+Genre is the strongest signal of whether a song fits a listener's context —
+a jazz fan during a study session wants jazz, not rock, even if both are "chill."
+Mood is a useful secondary filter but is less decisive on its own.
+
+#### Ranking Rule (the full catalog)
+
+Once every song has a numeric score, the system sorts the list from highest to lowest
+and returns the **top k** results. `sorted()` is used so the original catalog list
+is never mutated — the caller always has access to the unmodified data.
+
+**Why we need both rules:**
+The scoring rule is a judge for *one song*. The ranking rule is the mechanism that
+applies that judge to *every song in the catalog* and turns individual scores into an
+ordered shortlist. Without the ranking rule you would have a pile of numbers with no
+way to choose. Without the scoring rule the ranking rule has nothing meaningful to sort.
+Together they form the complete recommendation pipeline:
+
+```
+Input (UserProfile)
+       ↓
+  [For every Song in catalog]
+       ↓
+  score_song(user, song) → (score, reasons)
+       ↓
+  sorted(all_scored_songs, key=score, descending=True)
+       ↓
+  Top K results returned with explanation
+```
+
+---
+
+### 5. Potential Biases to Watch For
+
+Even this simple system has known weaknesses:
+
+- **Genre dominance:** At +2.0, a genre match is worth more than all three other
+  components combined. A mediocre pop song will almost always beat a near-perfect
+  lofi song for a pop-preferring user, even if their energy and mood are far off.
+- **Filter bubble risk:** If the catalog is skewed (e.g., 6 of 10 songs are pop),
+  the system will almost always recommend pop regardless of the user's energy or
+  mood preferences.
+- **Binary categorical matching:** Genre and mood are either a match or not —
+  there is no "partial credit" for related genres (rock vs metal) or related moods
+  (happy vs euphoric). This can produce counterintuitive rankings.
+- **Static profile:** The `UserProfile` never updates. Real platforms adjust
+  recommendations in real time based on skips and replays.
 
 ---
 
@@ -41,34 +164,31 @@ You can include a simple diagram or bullet list if helpful.
    python -m venv .venv
    source .venv/bin/activate      # Mac or Linux
    .venv\Scripts\activate         # Windows
+   ```
 
-2. Install dependencies
+2. Install dependencies:
 
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
 3. Run the app:
 
-```bash
-python -m src.main
-```
+   ```bash
+   python -m src.main
+   ```
 
 ### Running Tests
-
-Run the starter tests with:
 
 ```bash
 pytest
 ```
 
-You can add more tests in `tests/test_recommender.py`.
-
 ---
 
 ## Experiments You Tried
 
-Use this section to document the experiments you ran. For example:
+*(To be filled in during Phase 4 evaluation)*
 
 - What happened when you changed the weight on genre from 2.0 to 0.5
 - What happened when you added tempo or valence to the score
@@ -78,134 +198,16 @@ Use this section to document the experiments you ran. For example:
 
 ## Limitations and Risks
 
-Summarize some limitations of your recommender.
+*(Detailed analysis to be added in Phase 4; see also `model_card.md`)*
 
-Examples:
-
-- It only works on a tiny catalog
-- It does not understand lyrics or language
-- It might over favor one genre or mood
-
-You will go deeper on this in your model card.
+- The catalog is small — only 10 songs in the starter set
+- The system does not understand lyrics, cultural context, or listener history
+- Binary categorical matching may over-penalize closely related genres/moods
 
 ---
 
 ## Reflection
 
-Read and complete `model_card.md`:
+*(To be written after Phase 5)*
 
-[**Model Card**](model_card.md)
-
-Write 1 to 2 paragraphs here about what you learned:
-
-- about how recommenders turn data into predictions
-- about where bias or unfairness could show up in systems like this
-
-
----
-
-## 7. `model_card_template.md`
-
-Combines reflection and model card framing from the Module 3 guidance. :contentReference[oaicite:2]{index=2}  
-
-```markdown
-# 🎧 Model Card - Music Recommender Simulation
-
-## 1. Model Name
-
-Give your recommender a name, for example:
-
-> VibeFinder 1.0
-
----
-
-## 2. Intended Use
-
-- What is this system trying to do
-- Who is it for
-
-Example:
-
-> This model suggests 3 to 5 songs from a small catalog based on a user's preferred genre, mood, and energy level. It is for classroom exploration only, not for real users.
-
----
-
-## 3. How It Works (Short Explanation)
-
-Describe your scoring logic in plain language.
-
-- What features of each song does it consider
-- What information about the user does it use
-- How does it turn those into a number
-
-Try to avoid code in this section, treat it like an explanation to a non programmer.
-
----
-
-## 4. Data
-
-Describe your dataset.
-
-- How many songs are in `data/songs.csv`
-- Did you add or remove any songs
-- What kinds of genres or moods are represented
-- Whose taste does this data mostly reflect
-
----
-
-## 5. Strengths
-
-Where does your recommender work well
-
-You can think about:
-- Situations where the top results "felt right"
-- Particular user profiles it served well
-- Simplicity or transparency benefits
-
----
-
-## 6. Limitations and Bias
-
-Where does your recommender struggle
-
-Some prompts:
-- Does it ignore some genres or moods
-- Does it treat all users as if they have the same taste shape
-- Is it biased toward high energy or one genre by default
-- How could this be unfair if used in a real product
-
----
-
-## 7. Evaluation
-
-How did you check your system
-
-Examples:
-- You tried multiple user profiles and wrote down whether the results matched your expectations
-- You compared your simulation to what a real app like Spotify or YouTube tends to recommend
-- You wrote tests for your scoring logic
-
-You do not need a numeric metric, but if you used one, explain what it measures.
-
----
-
-## 8. Future Work
-
-If you had more time, how would you improve this recommender
-
-Examples:
-
-- Add support for multiple users and "group vibe" recommendations
-- Balance diversity of songs instead of always picking the closest match
-- Use more features, like tempo ranges or lyric themes
-
----
-
-## 9. Personal Reflection
-
-A few sentences about what you learned:
-
-- What surprised you about how your system behaved
-- How did building this change how you think about real music recommenders
-- Where do you think human judgment still matters, even if the model seems "smart"
-
+See [`model_card.md`](model_card.md) for the full model card.
