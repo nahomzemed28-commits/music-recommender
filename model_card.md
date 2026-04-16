@@ -1,111 +1,164 @@
 # 🎧 Model Card: Music Recommender Simulation
 
-## 1. Model Name  
+## 1. Model Name
 
-Give your model a short, descriptive name.  
-Example: **VibeFinder 1.0**  
-
----
-
-## 2. Intended Use  
-
-Describe what your recommender is designed to do and who it is for. 
-
-Prompts:  
-
-- What kind of recommendations does it generate  
-- What assumptions does it make about the user  
-- Is this for real users or classroom exploration  
+**VibeFinder 1.0**
 
 ---
 
-## 3. How the Model Works  
+## 2. Intended Use
 
-Explain your scoring approach in simple language.  
+VibeFinder 1.0 suggests the top 5 songs from a small curated catalog that best match
+a listener's stated taste profile — their preferred genre, mood, energy level, and
+whether they enjoy acoustic sounds.
 
-Prompts:  
-
-- What features of each song are used (genre, energy, mood, etc.)  
-- What user preferences are considered  
-- How does the model turn those into a score  
-- What changes did you make from the starter logic  
-
-Avoid code here. Pretend you are explaining the idea to a friend who does not program.
+It is designed for classroom exploration of how content-based recommender systems
+work. It is **not** intended for real users or production music apps. It assumes the
+user can accurately describe their own taste upfront; it cannot learn from listening
+history or adapt over time.
 
 ---
 
-## 4. Data  
+## 3. How the Model Works
 
-Describe the dataset the model uses.  
+Imagine you walk into a record store and hand the clerk a card that says: "I like
+pop music, happy songs, and high-energy tracks." The clerk then goes through every
+album in the store and gives each one a score based on how well it matches your card.
 
-Prompts:  
+That is exactly what VibeFinder does. For every song in the catalog it adds up points:
 
-- How many songs are in the catalog  
-- What genres or moods are represented  
-- Did you add or remove data  
-- Are there parts of musical taste missing in the dataset  
+- **+2 points** if the song's genre matches your favorite genre — the biggest signal.
+- **+1 point** if the song's mood matches your preferred mood.
+- **Up to +1 point** based on how close the song's energy is to your target. A perfect
+  match gives the full point; a song far from your target gets close to zero. This
+  "closeness" scoring means the system rewards the right *level* of energy, not just
+  "more is better."
+- **+0.5 bonus** if you enjoy acoustic music and the song is mostly acoustic.
 
----
-
-## 5. Strengths  
-
-Where does your system seem to work well  
-
-Prompts:  
-
-- User types for which it gives reasonable results  
-- Any patterns you think your scoring captures correctly  
-- Cases where the recommendations matched your intuition  
+After scoring every song, it sorts the list from highest to lowest and returns the
+top 5. The score for each recommendation is shown alongside a plain-English explanation
+of what contributed to it.
 
 ---
 
-## 6. Limitations and Bias 
+## 4. Data
 
-Where the system struggles or behaves unfairly. 
+The catalog contains **20 songs** stored in `data/songs.csv`. The starter dataset had
+10 songs (pop, lofi, rock, ambient, jazz, synthwave, indie pop); 10 more were added
+to improve diversity:
 
-Prompts:  
+| New genres added | New moods added |
+|---|---|
+| hip-hop, r&b, metal, classical | confident, romantic, angry |
+| country, edm, folk, blues | melancholic, euphoric, sad |
+| reggae, k-pop | calm, energetic |
 
-- Features it does not consider  
-- Genres or moods that are underrepresented  
-- Cases where the system overfits to one preference  
-- Ways the scoring might unintentionally favor some users  
+Each song is described by 7 features: genre, mood, energy (0–1), valence (0–1),
+danceability (0–1), acousticness (0–1), and tempo in BPM.
 
----
-
-## 7. Evaluation  
-
-How you checked whether the recommender behaved as expected. 
-
-Prompts:  
-
-- Which user profiles you tested  
-- What you looked for in the recommendations  
-- What surprised you  
-- Any simple tests or comparisons you ran  
-
-No need for numeric metrics unless you created some.
+**Gaps in the data:** There is only one song per genre for most genres. This means
+a rock fan gets one great match and then falls back to energy-only scoring. The
+catalog also has no songs in genres like soul, gospel, trap, bossa nova, or
+anything from non-English-speaking music scenes, which limits its coverage of global
+listening tastes.
 
 ---
 
-## 8. Future Work  
+## 5. Strengths
 
-Ideas for how you would improve the model next.  
-
-Prompts:  
-
-- Additional features or preferences  
-- Better ways to explain recommendations  
-- Improving diversity among the top results  
-- Handling more complex user tastes  
+- **Works well for common profiles.** The HAPPY_POP profile found a perfect 4.0
+  match (Sunrise City: genre + mood + energy all aligned), which intuitively feels
+  right.
+- **Acoustic listeners are well served.** The CHILL_LOFI profile scored 4.47 —
+  the highest of any tested profile — because the acoustic bonus stacked on top of
+  genre and mood matches.
+- **Niche profiles still get a winner.** The ADVERSARIAL Acoustic Classical profile
+  found Autumn Sonata at a perfect 4.50 score. Even with only one song in that genre,
+  the system correctly identified it and explained why.
+- **Transparent explanations.** Every recommendation comes with a plain list of
+  reasons, so users can immediately understand and critique the output.
 
 ---
 
-## 9. Personal Reflection  
+## 6. Limitations and Bias
 
-A few sentences about your experience.  
+**Genre dominance creates a filter bubble.** The genre component is worth +2.0 —
+more than the mood, energy, and acoustic bonus combined. This means a mediocre song
+in the right genre will almost always outrank an excellent song in a related genre.
+For example, the INTENSE_ROCK profile ranked Gym Hero (a pop/intense song) second —
+above Iron Cathedral (metal/angry, score 0.93) — solely because metal is not spelled
+"rock." A human listener would consider metal closer to rock than pop is, but the
+system treats them as completely unrelated.
 
-Prompts:  
+**Sparse catalog amplifies the bottleneck.** With only one rock song in 20 tracks,
+the INTENSE_ROCK profile gets a single strong match and then falls back to pure
+energy scoring. In a real catalog of millions, this dilution would not happen.
 
-- What you learned about recommender systems  
-- Something unexpected or interesting you discovered  
-- How this changed the way you think about music recommendation apps  
+**Conflicting preferences expose the genre-first bias.** The adversarial profile
+"EDM fan who wants sad music" revealed that when genre and mood conflict, genre
+always wins. Pulse Wave (EDM/euphoric) ranked first despite its mood being the
+opposite of what the user asked for, simply because its genre matched.
+
+**Binary categorical matching ignores musical similarity.** Rock and metal are
+closely related genres, just as "happy" and "euphoric" are closely related moods.
+The current scoring gives zero partial credit for near-matches, which produces
+counterintuitive rankings.
+
+**The profile is static.** A real listener's mood and energy preference shifts by
+time of day, season, and activity. VibeFinder has no way to adapt.
+
+---
+
+## 7. Evaluation
+
+**Profiles tested:**
+
+| Profile | Top result | Score | Felt right? |
+|---|---|---|---|
+| HAPPY_POP | Sunrise City (pop/happy) | 4.00 | Yes — perfect match |
+| CHILL_LOFI | Library Rain (lofi/chill) | 4.47 | Yes — exactly the vibe |
+| INTENSE_ROCK | Storm Runner (rock/intense) | 3.99 | Yes — but cliff after #1 |
+| ADVERSARIAL EDM/sad | Pulse Wave (EDM/euphoric) | 2.99 | No — mood ignored |
+| ADVERSARIAL Classical | Autumn Sonata (classical/melancholic) | 4.50 | Yes — perfect match |
+
+**What surprised me:**
+- Iron Cathedral (metal) ranked 5th for the rock profile, losing to a pop song and
+  three purely energy-matched tracks. The binary genre check completely failed to
+  recognize that metal is a close neighbor of rock.
+- The EDM/sad adversarial profile showed that when genre and mood pull in opposite
+  directions, the +2.0 genre weight always wins. The system cannot handle conflicting
+  preferences gracefully.
+
+**Weight-shift experiment (genre halved to +1.0, energy doubled to 2× proximity):**
+- For HAPPY_POP: Rooftop Lights (indie pop) jumped over Gym Hero because doubling
+  energy weight amplified the fact that Rooftop Lights' energy (0.76) is closer to
+  the target (0.82) than Gym Hero's (0.93).
+- For INTENSE_ROCK: Storm Runner still dominated. Iron Cathedral still ranked last
+  of the top 5. Halving genre weight narrowed the gap but did not fix the categorical
+  blind spot — metal still scored zero genre points.
+- **Conclusion:** The weight shift made the system more energy-sensitive but did not
+  fix the fundamental limitation of binary genre/mood matching.
+
+---
+
+## 8. Future Work
+
+1. **Soft genre similarity.** Replace exact genre matching with a similarity matrix
+   (e.g., rock ↔ metal = 0.8, rock ↔ jazz = 0.2) so related genres earn partial
+   credit instead of zero.
+2. **Expand the catalog.** With only 1–2 songs per genre, niche profiles are
+   under-served after the top pick. A realistic catalog would have hundreds of songs
+   per genre.
+3. **Diversity penalty.** Add a rule that prevents the top 5 from being dominated by
+   a single genre or artist. The CHILL_LOFI profile returned three lofi songs in a
+   row — a real platform would inject variety.
+4. **Dynamic profiles.** Allow the system to update `target_energy` based on time
+   of day or recent skips, making recommendations more context-aware.
+5. **Valence and danceability scoring.** These features are in the dataset but not
+   yet used in scoring. Adding them would give the system more expressive power.
+
+---
+
+## 9. Personal Reflection
+
+*(To be completed in Phase 5)*
