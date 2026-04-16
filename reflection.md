@@ -66,4 +66,26 @@ that gives metal partial genre credit when the user prefers rock.
 
 ## Personal Reflection
 
-*(To be completed in Phase 5)*
+Building VibeFinder forced me to confront how much human judgment is hidden inside
+even a "simple" algorithm. Choosing the weight of +2.0 for genre was not a
+mathematically derived decision — it was a guess based on intuition that genre is the
+strongest vibe signal. Testing that guess against the rock profile showed it was
+partially wrong: the weight was so dominant that it created a cliff after the first
+result, collapsing the remaining recommendations into pure energy-matching. That is
+not a bug in the code; it is a bias baked into the design. The code worked exactly as
+written. The design just did not match what a real listener would want.
+
+The most interesting thing about this project is how it reframes the way I think about
+Spotify or YouTube recommendations. Before building this, I assumed those platforms
+were doing something fundamentally different — some kind of deep understanding of music.
+Now I suspect the core is the same idea: score, rank, return the top items. The
+difference is scale (millions of songs), more features (audio fingerprinting, lyric
+analysis), and collaborative signals (what similar users skipped). The magic is not
+in the algorithm; it is in the data and the feedback loops.
+
+One thing AI tools helped clarify was the distinction between a scoring rule and a
+ranking rule. I originally thought of them as one thing — "recommend songs" — but
+separating them into `score_song` and `recommend_songs` made the logic much cleaner
+and easier to debug. When the output looked wrong, I could test each function
+independently instead of guessing where the problem was. That modular structure was
+a direct result of working through the design before writing any code.

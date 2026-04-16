@@ -216,6 +216,19 @@ pytest
 
 ## Reflection
 
-*(To be written after Phase 5)*
+Building VibeFinder made it clear that even a four-line scoring formula encodes
+real design choices with real consequences. The +2.0 genre weight felt intuitive
+when designing the system, but testing it against the INTENSE_ROCK profile revealed
+that it created a cliff: one great match followed by songs that barely related to
+what the user asked for. That is not a software bug — it is a design bias. The
+code did exactly what it was told. The telling was the problem.
 
-See [`model_card.md`](model_card.md) for the full model card.
+The other surprise was how quickly a simple algorithm can "feel" correct. Sunrise
+City ranking first for a pop/happy listener and Library Rain ranking first for a
+chill/lofi listener were genuinely satisfying results — and the system used only
+four scoring rules to get there. Real platforms have millions of songs and
+collaborative signals, but the core idea is the same: score every option, sort,
+return the top items. The complexity is in the data and the feedback loops, not in
+some fundamentally different kind of reasoning.
+
+See [`model_card.md`](model_card.md) for the full model card and [`reflection.md`](reflection.md) for detailed profile comparisons.

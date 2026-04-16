@@ -12,10 +12,21 @@ VibeFinder 1.0 suggests the top 5 songs from a small curated catalog that best m
 a listener's stated taste profile — their preferred genre, mood, energy level, and
 whether they enjoy acoustic sounds.
 
-It is designed for classroom exploration of how content-based recommender systems
-work. It is **not** intended for real users or production music apps. It assumes the
-user can accurately describe their own taste upfront; it cannot learn from listening
-history or adapt over time.
+It is designed for **classroom exploration** of how content-based recommender systems
+work. It assumes the user can accurately describe their own taste upfront; it cannot
+learn from listening history or adapt over time.
+
+**Intended use:**
+- Demonstrating and explaining the mechanics of a content-based recommender
+- Comparing how different user profiles produce different ranked outputs
+- Identifying bias and limitations in simple weighted scoring systems
+
+**Not intended for:**
+- Real users choosing what to listen to — the catalog is too small and the scoring
+  too rigid to serve genuine musical discovery
+- Any commercial or production music application
+- Representing the preferences of any demographic group — the catalog and profiles
+  were created for testing purposes only, not to reflect real listening populations
 
 ---
 
@@ -161,4 +172,40 @@ time of day, season, and activity. VibeFinder has no way to adapt.
 
 ## 9. Personal Reflection
 
-*(To be completed in Phase 5)*
+**Biggest learning moment:**
+The most surprising moment was when Iron Cathedral — a metal song with angry mood and
+0.97 energy — ranked below Gym Hero (a pop song) for a listener who explicitly asked
+for rock and intense music. I expected the system to "know" that metal is closer to
+rock than pop is. But it does not know anything like that. It only knows whether two
+strings are equal. That one ranking failure made the limitation of binary categorical
+matching click immediately: the system has no concept of musical relatedness,
+only exact matches.
+
+**How AI tools helped, and where I had to verify:**
+Using an AI assistant to design the scoring formula saved a lot of time — particularly
+the explanation of why proximity scoring (`1.0 - abs(a - b)`) is better than a flat
+"higher is better" rule. That was a non-obvious mathematical choice that became clear
+once explained. However, AI-generated suggestions always needed to be tested against
+the actual data. The adversarial EDM/sad profile, for example, was suggested as an
+edge case to try — and it exposed the genre-over-mood bias immediately. The insight
+came from running the code, not from the suggestion alone.
+
+**What surprised me about simple algorithms feeling like recommendations:**
+Even with just four scoring components and a 20-song catalog, the results for
+HAPPY_POP and CHILL_LOFI "felt right" intuitively. Sunrise City ranked first for a
+pop/happy listener; Library Rain ranked first for a chill/lofi listener. That was
+genuinely surprising — I expected a system this simple to produce obviously wrong
+results. It made me realize that the reason real platforms feel magical is not
+necessarily because their algorithms are incomprehensibly complex, but because they
+have millions of songs to rank and millions of users whose patterns reinforce each
+other. The core idea — score and sort — is the same.
+
+**What I would try next:**
+The most impactful improvement would be replacing binary genre matching with a
+similarity table (rock ↔ metal = 0.8, pop ↔ indie pop = 0.7) so that related genres
+earn partial credit instead of zero. After that, I would add the valence and
+danceability features to the scoring function — they are already in the dataset but
+not yet used, and they would help distinguish "happy and danceable" pop from "happy
+but slow" pop. Finally, I would implement a diversity penalty to prevent the top 5
+from stacking with songs from the same genre, which would make the recommendations
+feel more like a real playlist and less like a filter.
