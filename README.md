@@ -122,16 +122,23 @@ ordered shortlist. Without the ranking rule you would have a pile of numbers wit
 way to choose. Without the scoring rule the ranking rule has nothing meaningful to sort.
 Together they form the complete recommendation pipeline:
 
-```
-Input (UserProfile)
-       ↓
-  [For every Song in catalog]
-       ↓
-  score_song(user, song) → (score, reasons)
-       ↓
-  sorted(all_scored_songs, key=score, descending=True)
-       ↓
-  Top K results returned with explanation
+```mermaid
+flowchart TD
+    A([UserProfile\nfavorite_genre · favorite_mood\ntarget_energy · likes_acoustic]) --> B
+
+    B[Load songs.csv\ninto list of dicts] --> C
+
+    C{For every Song\nin catalog}
+
+    C --> D["score_song(user, song)\n────────────────────\n+2.0  genre match\n+1.0  mood match\n+proximity  energy\n+0.5  acoustic bonus"]
+
+    D --> E[Attach score + reasons\nto song dict]
+
+    E --> C
+
+    C -- all songs scored --> F["sorted(songs, key=score, reverse=True)"]
+
+    F --> G([Top K results\nwith explanations])
 ```
 
 ---
@@ -200,9 +207,10 @@ pytest
 
 *(Detailed analysis to be added in Phase 4; see also `model_card.md`)*
 
-- The catalog is small — only 10 songs in the starter set
+- The catalog has 20 songs — enough for testing but far too small for real use
 - The system does not understand lyrics, cultural context, or listener history
 - Binary categorical matching may over-penalize closely related genres/moods
+- This system might over-prioritize genre, ignoring great songs that closely match the user's mood and energy but belong to a different genre
 
 ---
 
